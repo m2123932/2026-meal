@@ -3,49 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026</title>
+    <title>Meal Planner 2026 - Separation Fix</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --gold: #d4af37; --bg: #0a0805; --past-text: #5c5248; --today-bg: #1e1a11; --weekend: #ff7e67; }
-        body { background: #1a120b; color: var(--gold); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; margin: 0; padding: 10px; text-align: center; }
+        :root { --gold: #d4af37; --bg: #0a0805; --past: #3d3428; --weekend: #ff7e67; }
+        body { background: #1a120b; color: var(--gold); font-family: sans-serif; margin: 0; padding: 10px; text-align: center; }
         
         .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 15px auto; }
-        .nav-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 8px 18px; border-radius: 20px; cursor: pointer; font-size: 13px; }
+        .nav-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 8px 15px; border-radius: 20px; cursor: pointer; }
         
-        table { width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; background: var(--bg); border: 1px solid var(--gold); }
-        tr { border-bottom: 1px solid rgba(212, 175, 55, 0.2); }
-        
-        .date-col { width: 90px; padding: 15px 10px; text-align: left; border-right: 1px solid rgba(212, 175, 55, 0.2); vertical-align: middle; }
-        .day-label { font-size: 10px; letter-spacing: 1px; opacity: 0.7; margin-bottom: 3px; display: block; }
-        .date-num { font-size: 32px; font-weight: 900; line-height: 0.9; display: block; }
-        
-        .meal-col { padding: 12px 18px; text-align: left; vertical-align: middle; }
-        .slot { min-height: 38px; display: flex; align-items: center; border-radius: 4px; margin: 4px 0; cursor: pointer; border: 1px solid transparent; }
-        .lunch { color: #eee6ac; font-size: 17px; }
-        .dinner { color: #ffffff; font-size: 17px; }
-        
-        .past { opacity: 0.4; }
-        .today { background: var(--today-bg); }
-        .today .date-num { color: #fff; text-shadow: 0 0 8px var(--gold); }
+        /* 每天分隔強化方案 */
+        table { 
+            width: 100%; 
+            max-width: 500px; 
+            margin: 0 auto; 
+            /* 關鍵：開啟間距並設置間隔高度 */
+            border-collapse: separate; 
+            border-spacing: 0 10px; 
+            table-layout: fixed;
+        }
 
-        /* 六日樣式 */
-        .weekend-row { background: rgba(255, 126, 103, 0.03); }
-        .weekend-row .date-num, .weekend-row .day-label { color: var(--weekend); }
+        /* 讓每一行看起來像獨立的區塊 */
+        tr { 
+            background: var(--bg);
+            outline: 1px solid var(--gold); /* 使用 outline 避免 border 擠壓 */
+        }
+        
+        /* 左側日期區塊 */
+        .date-col { 
+            width: 85px; 
+            padding: 12px 10px; 
+            text-align: left; 
+            border-right: 1px solid var(--gold); /* 星期與餐點的分隔線 */
+            vertical-align: middle;
+        }
 
-        .drag-over { background: rgba(212, 175, 55, 0.15) !important; border: 1px dashed #fff !important; }
+        .day-label { font-size: 10px; display: block; opacity: 0.8; margin-bottom: 2px; }
+        .date-num { font-size: 30px; font-weight: bold; line-height: 1; }
+        
+        /* 右側餐點區塊 */
+        .meal-col { padding: 10px 15px; text-align: left; vertical-align: middle; }
+        .slot { min-height: 38px; display: flex; align-items: center; cursor: pointer; margin: 4px 0; border-radius: 4px; }
+        .lunch { color: #eee6ac; border-bottom: 1px dotted rgba(212, 175, 55, 0.2); } /* 午晚餐間微弱分隔 */
+        .dinner { color: #ffffff; }
+        
+        /* 狀態樣式 */
+        .past { opacity: 0.3; }
+        .today { outline: 2px solid #fff !important; background: #2a2015; } /* 今日加亮外框 */
+        .weekend-row { outline: 1px solid var(--weekend); background: rgba(255, 126, 103, 0.05); }
+        .weekend-row .date-num, .weekend-row .day-label, .weekend-row .date-col { color: var(--weekend); border-right-color: var(--weekend); }
+        
+        .drag-over { background: rgba(212, 175, 55, 0.2) !important; outline: 1px dashed #fff; }
     </style>
 </head>
 <body>
-
-    <h2 style="letter-spacing: 6px; font-weight: 200; margin: 10px 0;">MENU · WEEKLY</h2>
-    
+    <h3 style="letter-spacing: 5px; margin: 10px 0; font-weight: normal;">MENU · WEEKLY</h3>
     <div class="nav">
         <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
-        <span id="rangeDisplay" style="font-weight: bold;">Loading...</span>
+        <span id="rangeDisplay" style="font-weight: bold; font-size: 18px;">載入中...</span>
         <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
     </div>
-
+    
     <table id="mealTable"></table>
 
     <script>
@@ -63,8 +82,7 @@
         let day = currentMon.getDay();
         currentMon.setDate(currentMon.getDate() - (day === 0 ? 6 : day - 1));
         currentMon.setHours(0,0,0,0);
-
-        let dragSource = null;
+        let dragSrc = null;
 
         function render() {
             const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
@@ -77,4 +95,54 @@
                 const labels = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
                 const today = new Date(); today.setHours(0,0,0,0);
 
-                for (let i = 0; i
+                for (let i = 0; i < 7; i++) {
+                    let d = new Date(currentMon); d.setDate(d.getDate() + i);
+                    let key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                    let m = data[key] || {};
+                    let isWE = (i >= 5);
+                    let status = (d < today) ? "past" : (d.getTime() === today.getTime() ? "today" : "");
+                    
+                    let lTxt = m.lunch ? '☀️ ' + m.lunch : (isWE ? '☀️ -' : '');
+                    let dTxt = m.dinner ? '🌙 ' + m.dinner : (isWE ? '🌙 -' : '');
+
+                    table.innerHTML += `<tr class="${status} ${isWE ? 'weekend-row' : ''}">
+                        <td class="date-col">
+                            <span class="day-label">${labels[i]}</span>
+                            <span class="date-num">${d.getDate()}</span>
+                        </td>
+                        <td class="meal-col">
+                            <div class="slot lunch" draggable="true" ondragstart="drag('${key}','lunch','${m.lunch||""}')" 
+                                 ondragover="e=>e.preventDefault()" ondrop="drop(event,'${key}','lunch')" onclick="edit('${key}','lunch','${m.lunch||""}')">
+                                 ${lTxt}
+                            </div>
+                            <div class="slot dinner" draggable="true" ondragstart="drag('${key}','dinner','${m.dinner||""}')" 
+                                 ondragover="e=>e.preventDefault()" ondrop="drop(event,'${key}','dinner')" onclick="edit('${key}','dinner','${m.dinner||""}')">
+                                 ${dTxt}
+                            </div>
+                        </td>
+                    </tr>`;
+                }
+            });
+        }
+
+        function drag(k,t,v) { if(v) dragSrc = {k,t,v}; }
+        function drop(e,toK,toT) {
+            e.preventDefault();
+            if(!dragSrc) return;
+            db.ref('meals_v2').child(dragSrc.k).child(dragSrc.t).remove();
+            db.ref('meals_v2').child(toK).update({ [toT]: dragSrc.v });
+            dragSrc = null;
+        }
+
+        function edit(k,t,old) {
+            let v = prompt(`編輯${t==='lunch'?'午餐':'晚餐'}:`, old);
+            if (v !== null) {
+                if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
+                else db.ref('meals_v2').child(k).update({ [t]: v });
+            }
+        }
+        function moveWeek(n) { currentMon.setDate(currentMon.getDate()+n); render(); }
+        render();
+    </script>
+</body>
+</html>
