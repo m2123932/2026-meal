@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Bold Type</title>
+    <title>Meal Planner 2026 - Mobile Touch</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -22,88 +22,61 @@
             font-family: -apple-system, sans-serif; 
             margin: 0; 
             padding: 15px; 
-            text-align: center; 
+            text-align: center;
+            overflow-x: hidden;
+            touch-action: pan-y; /* 允許垂直捲動，但禁止系統處理拖曳 */
         }
         
         .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
-        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 6px 16px; border-radius: 15px; cursor: pointer; font-size: 12px; }
+        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 8px 18px; border-radius: 15px; cursor: pointer; font-size: 14px; }
         
         table { 
-            width: 100%; 
-            max-width: 500px; 
-            margin: 0 auto; 
-            border-collapse: collapse; 
-            background: var(--bg); 
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--gold-light);
+            width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; 
+            background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--gold-light);
         }
 
-        tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); transition: 0.3s; }
-        tr:last-child { border-bottom: none; }
+        tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
+        .date-col { width: 85px; padding: 20px 12px; text-align: left; border-right: 1px solid rgba(197, 160, 89, 0.1); vertical-align: middle; }
+        .day-label { font-size: 13px; display: block; opacity: 0.7; letter-spacing: 1.5px; margin-bottom: 4px; font-weight: 500; }
+        .date-num { font-size: 38px; font-weight: 500; line-height: 0.9; color: var(--gold); }
         
-        /* 左側日期區塊 - 加大字體 */
-        .date-col { 
-            width: 85px; /* 增加寬度以容納大字 */
-            padding: 20px 12px; 
-            text-align: left; 
-            border-right: 1px solid rgba(197, 160, 89, 0.1); 
-            vertical-align: middle;
-        }
-
-        .day-label { 
-            font-size: 13px; /* 放大星期字體 */
-            display: block; 
-            opacity: 0.7; 
-            letter-spacing: 1.5px; 
-            margin-bottom: 4px; 
-            font-weight: 500;
-        }
-        .date-num { 
-            font-size: 38px; /* 顯著放大日期數字 */
-            font-weight: 500; 
-            line-height: 0.9; 
-            color: var(--gold); 
-        }
+        .meal-col { padding: 12px 18px; text-align: left; vertical-align: middle; position: relative; }
         
-        .meal-col { padding: 12px 18px; text-align: left; vertical-align: middle; }
-        
+        /* 增加感應區面積 */
         .slot { 
-            min-height: 38px; 
-            display: flex; 
-            align-items: center; 
-            cursor: grab; 
-            font-size: 17px; /* 稍微放大餐點字體 */
-            margin: 6px 0;
-            padding: 4px 8px;
-            border-radius: 6px;
-            transition: 0.2s;
-            border: 1px solid transparent;
+            min-height: 45px; display: flex; align-items: center; 
+            font-size: 17px; margin: 6px 0; padding: 4px 8px; border-radius: 6px; 
+            transition: 0.2s; border: 1px solid transparent;
+            user-select: none; -webkit-user-select: none; /* 防止手機選取文字 */
         }
 
-        .dragging { opacity: 0.4; background: var(--gold-light); }
-        .drag-over { background: rgba(197, 160, 89, 0.15) !important; border: 1px dashed var(--gold); }
+        /* 拖曳中的視覺回饋 */
+        .drag-over { background: rgba(197, 160, 89, 0.2) !important; border: 1px dashed var(--gold) !important; }
+        
+        /* 手機拖曳時跟隨手指的虛影樣式 */
+        #drag-proxy {
+            position: fixed; pointer-events: none; z-index: 1000;
+            background: var(--gold); color: #000; padding: 8px 15px;
+            border-radius: 8px; font-size: 16px; opacity: 0.8; display: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
 
         .past { opacity: 0.3; }
         .today { background: rgba(197, 160, 89, 0.08); } 
-        .today .date-num { font-weight: 700; text-shadow: 0 0 12px rgba(197, 160, 89, 0.4); }
-
         .weekend-row { background: rgba(217, 136, 123, 0.02); }
         .weekend-row .date-num, .weekend-row .day-label { color: var(--weekend); }
     </style>
 </head>
 <body>
-    <h3 style="letter-spacing: 5px; margin: 15px 0; font-weight: 300; color: var(--gold); font-size: 1.2rem;">PLANNER</h3>
-    
+    <h3 style="letter-spacing: 5px; margin: 15px 0; font-weight: 300; color: var(--gold);">PLANNER</h3>
     <div class="nav">
         <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
-        <span id="rangeDisplay" style="font-weight: 400; font-size: 17px; color: var(--gold);">Loading...</span>
+        <span id="rangeDisplay" style="font-size: 17px; color: var(--gold);">Loading...</span>
         <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
     </div>
     
     <table id="mealTable"></table>
-
-    <script>
+    <div id="drag-proxy"></div> <script>
         const config = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -118,7 +91,9 @@
         let day = currentMon.getDay();
         currentMon.setDate(currentMon.getDate() - (day === 0 ? 6 : day - 1));
         currentMon.setHours(0,0,0,0);
-        let dragSource = null;
+
+        let dragData = null;
+        let proxy = document.getElementById('drag-proxy');
 
         function render() {
             const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
@@ -147,19 +122,15 @@
                             <span class="date-num">${d.getDate()}</span>
                         </td>
                         <td class="meal-col">
-                            <div class="slot" draggable="true" 
-                                 ondragstart="handleDragStart(event,'${key}','lunch','${m.lunch||""}')" 
-                                 ondragover="handleDragOver(event)"
-                                 ondragleave="handleDragLeave(event)"
-                                 ondrop="handleDrop(event,'${key}','lunch')"
+                            <div class="slot" 
+                                 data-key="${key}" data-type="lunch" data-val="${m.lunch||""}"
+                                 ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)"
                                  onclick="edit('${key}','lunch','${m.lunch||""}')">
                                  ${lTxt}
                             </div>
-                            <div class="slot" draggable="true" 
-                                 ondragstart="handleDragStart(event,'${key}','dinner','${m.dinner||""}')"
-                                 ondragover="handleDragOver(event)"
-                                 ondragleave="handleDragLeave(event)"
-                                 ondrop="handleDrop(event,'${key}','dinner')"
+                            <div class="slot" 
+                                 data-key="${key}" data-type="dinner" data-val="${m.dinner||""}"
+                                 ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)"
                                  onclick="edit('${key}','dinner','${m.dinner||""}')">
                                  ${dTxt}
                             </div>
@@ -169,38 +140,78 @@
             });
         }
 
-        function handleDragStart(e, k, t, v) {
-            if(!v || v === "-") { e.preventDefault(); return; }
-            dragSource = {k, t, v};
-            e.target.classList.add('dragging');
+        // --- 手機觸控拖曳邏輯 ---
+        let startX, startY;
+        function ts(e) {
+            const el = e.currentTarget;
+            const val = el.getAttribute('data-val');
+            if(!val || val === "-") return; // 空的不能拖
+
+            // 延遲判斷：如果是短按則觸發編輯，長按才觸發拖曳 (這裡我們先簡單處理)
+            dragData = {
+                key: el.getAttribute('data-key'),
+                type: el.getAttribute('data-type'),
+                val: val
+            };
+            proxy.innerText = el.innerText;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
         }
 
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('drag-over');
+        function tm(e) {
+            if(!dragData) return;
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
+
+            // 顯示虛影並跟隨手指
+            proxy.style.display = 'block';
+            proxy.style.left = (x + 10) + 'px';
+            proxy.style.top = (y - 40) + 'px';
+
+            // 偵測手指下方的格子並加入視覺效果
+            const target = document.elementFromPoint(x, y);
+            document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+            const slot = target ? target.closest('.slot') : null;
+            if(slot) slot.classList.add('drag-over');
+            
+            // 防止螢幕捲動
+            if(Math.abs(y - startY) > 10) e.preventDefault();
         }
 
-        function handleDragLeave(e) {
-            e.currentTarget.classList.remove('drag-over');
-        }
+        function te(e) {
+            if(!dragData) return;
+            proxy.style.display = 'none';
+            
+            const x = e.changedTouches[0].clientX;
+            const y = e.changedTouches[0].clientY;
+            const target = document.elementFromPoint(x, y);
+            const slot = target ? target.closest('.slot') : null;
 
-        function handleDrop(e, toK, toT) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-            if(!dragSource) return;
-            if(dragSource.k === toK && dragSource.t === toT) return;
-            db.ref('meals_v2').child(dragSource.k).child(dragSource.t).remove();
-            db.ref('meals_v2').child(toK).update({ [toT]: dragSource.v });
-            dragSource = null;
+            if(slot) {
+                const toK = slot.getAttribute('data-key');
+                const toT = slot.getAttribute('data-type');
+                if(dragData.key !== toK || dragData.type !== toT) {
+                    db.ref('meals_v2').child(dragData.key).child(dragData.type).remove();
+                    db.ref('meals_v2').child(toK).update({ [toT]: dragData.val });
+                }
+            }
+            
+            document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+            dragData = null;
         }
 
         function edit(k, t, old) {
-            let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
-            if (v !== null) {
-                if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
-                else db.ref('meals_v2').child(k).update({ [t]: v });
-            }
+            // 為了不干擾拖曳，我們可以加個判斷，但 prompt 會阻塞，通常沒問題
+            setTimeout(() => {
+                if(dragData) return; // 正在拖曳就不編輯
+                let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
+                if (v !== null) {
+                    if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
+                    else db.ref('meals_v2').child(k).update({ [t]: v });
+                }
+            }, 100);
         }
+
         function moveWeek(n) { currentMon.setDate(currentMon.getDate()+n); render(); }
         render();
     </script>
