@@ -3,65 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Separation Fix</title>
+    <title>Meal Planner 2026 - Bold Type</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        :root { --gold: #d4af37; --bg: #0a0805; --past: #3d3428; --weekend: #ff7e67; }
-        body { background: #1a120b; color: var(--gold); font-family: sans-serif; margin: 0; padding: 10px; text-align: center; }
+        :root { 
+            --gold: #c5a059; 
+            --gold-light: rgba(197, 160, 89, 0.2);
+            --bg: #0f0d0a; 
+            --text-main: #e0d5c1;
+            --past: #554d44; 
+            --weekend: #d9887b; 
+        }
         
-        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 15px auto; }
-        .nav-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 8px 15px; border-radius: 20px; cursor: pointer; }
+        body { 
+            background: #15120e; 
+            color: var(--text-main); 
+            font-family: -apple-system, sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            text-align: center; 
+        }
         
-        /* 每天分隔強化方案 */
+        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
+        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 6px 16px; border-radius: 15px; cursor: pointer; font-size: 12px; }
+        
         table { 
             width: 100%; 
             max-width: 500px; 
             margin: 0 auto; 
-            /* 關鍵：開啟間距並設置間隔高度 */
-            border-collapse: separate; 
-            border-spacing: 0 10px; 
-            table-layout: fixed;
+            border-collapse: collapse; 
+            background: var(--bg); 
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--gold-light);
         }
 
-        /* 讓每一行看起來像獨立的區塊 */
-        tr { 
-            background: var(--bg);
-            outline: 1px solid var(--gold); /* 使用 outline 避免 border 擠壓 */
-        }
+        tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); transition: 0.3s; }
+        tr:last-child { border-bottom: none; }
         
-        /* 左側日期區塊 */
+        /* 左側日期區塊 - 加大字體 */
         .date-col { 
-            width: 85px; 
-            padding: 12px 10px; 
+            width: 85px; /* 增加寬度以容納大字 */
+            padding: 20px 12px; 
             text-align: left; 
-            border-right: 1px solid var(--gold); /* 星期與餐點的分隔線 */
+            border-right: 1px solid rgba(197, 160, 89, 0.1); 
             vertical-align: middle;
         }
 
-        .day-label { font-size: 10px; display: block; opacity: 0.8; margin-bottom: 2px; }
-        .date-num { font-size: 30px; font-weight: bold; line-height: 1; }
+        .day-label { 
+            font-size: 13px; /* 放大星期字體 */
+            display: block; 
+            opacity: 0.7; 
+            letter-spacing: 1.5px; 
+            margin-bottom: 4px; 
+            font-weight: 500;
+        }
+        .date-num { 
+            font-size: 38px; /* 顯著放大日期數字 */
+            font-weight: 500; 
+            line-height: 0.9; 
+            color: var(--gold); 
+        }
         
-        /* 右側餐點區塊 */
-        .meal-col { padding: 10px 15px; text-align: left; vertical-align: middle; }
-        .slot { min-height: 38px; display: flex; align-items: center; cursor: pointer; margin: 4px 0; border-radius: 4px; }
-        .lunch { color: #eee6ac; border-bottom: 1px dotted rgba(212, 175, 55, 0.2); } /* 午晚餐間微弱分隔 */
-        .dinner { color: #ffffff; }
+        .meal-col { padding: 12px 18px; text-align: left; vertical-align: middle; }
         
-        /* 狀態樣式 */
+        .slot { 
+            min-height: 38px; 
+            display: flex; 
+            align-items: center; 
+            cursor: grab; 
+            font-size: 17px; /* 稍微放大餐點字體 */
+            margin: 6px 0;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .dragging { opacity: 0.4; background: var(--gold-light); }
+        .drag-over { background: rgba(197, 160, 89, 0.15) !important; border: 1px dashed var(--gold); }
+
         .past { opacity: 0.3; }
-        .today { outline: 2px solid #fff !important; background: #2a2015; } /* 今日加亮外框 */
-        .weekend-row { outline: 1px solid var(--weekend); background: rgba(255, 126, 103, 0.05); }
-        .weekend-row .date-num, .weekend-row .day-label, .weekend-row .date-col { color: var(--weekend); border-right-color: var(--weekend); }
-        
-        .drag-over { background: rgba(212, 175, 55, 0.2) !important; outline: 1px dashed #fff; }
+        .today { background: rgba(197, 160, 89, 0.08); } 
+        .today .date-num { font-weight: 700; text-shadow: 0 0 12px rgba(197, 160, 89, 0.4); }
+
+        .weekend-row { background: rgba(217, 136, 123, 0.02); }
+        .weekend-row .date-num, .weekend-row .day-label { color: var(--weekend); }
     </style>
 </head>
 <body>
-    <h3 style="letter-spacing: 5px; margin: 10px 0; font-weight: normal;">MENU · WEEKLY</h3>
+    <h3 style="letter-spacing: 5px; margin: 15px 0; font-weight: 300; color: var(--gold); font-size: 1.2rem;">PLANNER</h3>
+    
     <div class="nav">
         <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
-        <span id="rangeDisplay" style="font-weight: bold; font-size: 18px;">載入中...</span>
+        <span id="rangeDisplay" style="font-weight: 400; font-size: 17px; color: var(--gold);">Loading...</span>
         <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
     </div>
     
@@ -82,17 +118,17 @@
         let day = currentMon.getDay();
         currentMon.setDate(currentMon.getDate() - (day === 0 ? 6 : day - 1));
         currentMon.setHours(0,0,0,0);
-        let dragSrc = null;
+        let dragSource = null;
 
         function render() {
             const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
-            document.getElementById('rangeDisplay').innerText = `${currentMon.getMonth()+1}/${currentMon.getDate()} - ${sun.getMonth()+1}/${sun.getDate()}`;
+            document.getElementById('rangeDisplay').innerText = `${currentMon.getMonth()+1}/${currentMon.getDate()} — ${sun.getMonth()+1}/${sun.getDate()}`;
             
             db.ref('meals_v2').on('value', snap => {
                 const data = snap.val() || {};
                 const table = document.getElementById('mealTable');
                 table.innerHTML = "";
-                const labels = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+                const labels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
                 const today = new Date(); today.setHours(0,0,0,0);
 
                 for (let i = 0; i < 7; i++) {
@@ -111,12 +147,20 @@
                             <span class="date-num">${d.getDate()}</span>
                         </td>
                         <td class="meal-col">
-                            <div class="slot lunch" draggable="true" ondragstart="drag('${key}','lunch','${m.lunch||""}')" 
-                                 ondragover="e=>e.preventDefault()" ondrop="drop(event,'${key}','lunch')" onclick="edit('${key}','lunch','${m.lunch||""}')">
+                            <div class="slot" draggable="true" 
+                                 ondragstart="handleDragStart(event,'${key}','lunch','${m.lunch||""}')" 
+                                 ondragover="handleDragOver(event)"
+                                 ondragleave="handleDragLeave(event)"
+                                 ondrop="handleDrop(event,'${key}','lunch')"
+                                 onclick="edit('${key}','lunch','${m.lunch||""}')">
                                  ${lTxt}
                             </div>
-                            <div class="slot dinner" draggable="true" ondragstart="drag('${key}','dinner','${m.dinner||""}')" 
-                                 ondragover="e=>e.preventDefault()" ondrop="drop(event,'${key}','dinner')" onclick="edit('${key}','dinner','${m.dinner||""}')">
+                            <div class="slot" draggable="true" 
+                                 ondragstart="handleDragStart(event,'${key}','dinner','${m.dinner||""}')"
+                                 ondragover="handleDragOver(event)"
+                                 ondragleave="handleDragLeave(event)"
+                                 ondrop="handleDrop(event,'${key}','dinner')"
+                                 onclick="edit('${key}','dinner','${m.dinner||""}')">
                                  ${dTxt}
                             </div>
                         </td>
@@ -125,17 +169,33 @@
             });
         }
 
-        function drag(k,t,v) { if(v) dragSrc = {k,t,v}; }
-        function drop(e,toK,toT) {
-            e.preventDefault();
-            if(!dragSrc) return;
-            db.ref('meals_v2').child(dragSrc.k).child(dragSrc.t).remove();
-            db.ref('meals_v2').child(toK).update({ [toT]: dragSrc.v });
-            dragSrc = null;
+        function handleDragStart(e, k, t, v) {
+            if(!v || v === "-") { e.preventDefault(); return; }
+            dragSource = {k, t, v};
+            e.target.classList.add('dragging');
         }
 
-        function edit(k,t,old) {
-            let v = prompt(`編輯${t==='lunch'?'午餐':'晚餐'}:`, old);
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e, toK, toT) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            if(!dragSource) return;
+            if(dragSource.k === toK && dragSource.t === toT) return;
+            db.ref('meals_v2').child(dragSource.k).child(dragSource.t).remove();
+            db.ref('meals_v2').child(toK).update({ [toT]: dragSource.v });
+            dragSource = null;
+        }
+
+        function edit(k, t, old) {
+            let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
             if (v !== null) {
                 if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
                 else db.ref('meals_v2').child(k).update({ [t]: v });
