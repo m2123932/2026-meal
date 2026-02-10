@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Compact</title>
+    <title>Meal Planner 2026 - No Selection</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -17,12 +17,18 @@
             background: #12100d; color: var(--text-main);
             font-family: -apple-system, sans-serif;
             overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
+            
+            /* 關鍵：全域封鎖文字選取與 iOS 長按選單 */
+            -webkit-user-select: none;  
+            -moz-user-select: none;     
+            -ms-user-select: none;      
+            user-select: none;
+            -webkit-touch-callout: none; /* 禁用 iOS 長按選單 */
         }
 
         body.is-dragging { overflow: hidden !important; touch-action: none !important; }
 
-        /* 標題與導航更緊湊 */
-        .header-area { padding: 10px 0 5px 0; }
+        .header-area { padding: 10px 0 5px 0; text-align: center; }
         h3 { letter-spacing: 4px; margin: 5px 0; font-size: 18px; color: var(--gold); }
         
         .nav { 
@@ -34,7 +40,6 @@
             color: var(--gold); padding: 5px 15px; border-radius: 8px; font-size: 13px;
         }
         
-        /* 表格充滿感 */
         table { 
             width: 98%; max-width: 600px; margin: 0 auto 50px auto; border-collapse: collapse; 
             background: var(--bg); border-radius: 8px; overflow: hidden;
@@ -42,16 +47,14 @@
 
         tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
         
-        /* 壓縮日期欄位 */
         .date-col { 
             width: 65px; padding: 8px 5px; text-align: center; 
             border-right: 1px solid rgba(197, 160, 89, 0.1); 
             background: rgba(255,255,255,0.01);
         }
-        .day-label { font-size: 11px; opacity: 0.5; margin-bottom: -2px; }
+        .day-label { font-size: 11px; opacity: 0.5; }
         .date-num { font-size: 28px; font-weight: 600; color: var(--gold); line-height: 1.1; }
         
-        /* 壓縮餐點欄位 */
         .meal-col { padding: 4px 10px; text-align: left; }
         
         .slot { 
@@ -71,7 +74,6 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.5); font-weight: bold; font-size: 15px;
         }
 
-        .past { opacity: 0.6; }
         .today { background: rgba(197, 160, 89, 0.05); }
     </style>
 </head>
@@ -89,6 +91,7 @@
     <div id="drag-proxy"></div>
 
     <script>
+        // Firebase 設定不變
         const config = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -124,9 +127,8 @@
                     let key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
                     let m = data[key] || {};
                     let isToday = d.getTime() === now.getTime();
-                    let isPast = d < now;
                     
-                    table.innerHTML += `<tr class="${isToday?'today':''} ${isPast?'past':''}">
+                    table.innerHTML += `<tr class="${isToday?'today':''}">
                         <td class="date-col">
                             <div class="day-label">${labels[i]}</div>
                             <div class="date-num">${d.getDate()}</div>
@@ -143,22 +145,27 @@
         const handleStart = (e) => {
             const el = e.target.closest('.slot');
             if (!el) return;
+
+            // 關鍵：在按下時立刻阻止預設行為 (包括選取)
+            if (e.cancelable) e.preventDefault();
+
             const x = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            
             dragData = {
                 key: el.dataset.key, type: el.dataset.type, val: el.dataset.val,
                 text: el.innerText, startX: x, startY: y, moved: false, startTime: Date.now()
             };
-            if (e.type === 'mousedown') e.preventDefault();
         };
 
         const handleMove = (e) => {
             if (!dragData) return;
+            
             const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
             const dist = Math.sqrt(Math.pow(x - dragData.startX, 2) + Math.pow(y - dragData.startY, 2));
 
-            if (!dragData.moved && dist > 10) {
+            if (!dragData.moved && dist > 8) {
                 dragData.moved = true;
                 body.classList.add('is-dragging'); 
             }
@@ -200,12 +207,18 @@
             dragData = null;
         };
 
+        // 徹底禁止右鍵選單 (長按選單)
+        window.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.slot')) e.preventDefault();
+        }, false);
+
         window.addEventListener('mousedown', handleStart, { passive: false });
-        window.addEventListener('touchstart', handleStart, { passive: true });
+        window.addEventListener('touchstart', handleStart, { passive: false }); // 這裡改為 passive: false 才能 prevent
         window.addEventListener('mousemove', handleMove, { passive: false });
         window.addEventListener('touchmove', handleMove, { passive: false });
         window.addEventListener('mouseup', handleEnd);
         window.addEventListener('touchend', handleEnd);
+        
         window.ondragstart = () => false;
 
         function edit(k, t, old) {
