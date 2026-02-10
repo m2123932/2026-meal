@@ -3,68 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Mobile Touch</title>
+    <title>Meal Planner 2026 - Ultimate Drag</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         :root { 
-            --gold: #c5a059; 
-            --gold-light: rgba(197, 160, 89, 0.2);
-            --bg: #0f0d0a; 
-            --text-main: #e0d5c1;
-            --past: #554d44; 
-            --weekend: #d9887b; 
+            --gold: #c5a059; --gold-light: rgba(197, 160, 89, 0.2);
+            --bg: #0f0d0a; --text-main: #e0d5c1; --weekend: #d9887b; 
         }
         
         body { 
-            background: #15120e; 
-            color: var(--text-main); 
-            font-family: -apple-system, sans-serif; 
-            margin: 0; 
-            padding: 15px; 
-            text-align: center;
-            overflow-x: hidden;
-            touch-action: pan-y; /* 允許垂直捲動，但禁止系統處理拖曳 */
+            background: #15120e; color: var(--text-main); 
+            font-family: -apple-system, sans-serif; margin: 0; padding: 15px; text-align: center;
+            /* 徹底禁止所有原生選取行為 */
+            user-select: none; -webkit-user-select: none; 
+            touch-action: pan-y;
         }
         
-        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
-        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 8px 18px; border-radius: 15px; cursor: pointer; font-size: 14px; }
+        /* 核心修正：禁止瀏覽器自帶的拖曳行為 */
+        * { -webkit-user-drag: none; -moz-user-drag: none; }
         
+        body.lock-scroll { overflow: hidden !important; touch-action: none; }
+
         table { 
             width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; 
             background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--gold-light);
         }
 
         tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
-        .date-col { width: 85px; padding: 20px 12px; text-align: left; border-right: 1px solid rgba(197, 160, 89, 0.1); vertical-align: middle; }
-        .day-label { font-size: 13px; display: block; opacity: 0.7; letter-spacing: 1.5px; margin-bottom: 4px; font-weight: 500; }
-        .date-num { font-size: 38px; font-weight: 500; line-height: 0.9; color: var(--gold); }
+        .date-col { width: 85px; padding: 20px 12px; text-align: left; border-right: 1px solid rgba(197, 160, 89, 0.1); pointer-events: none; }
+        .day-label { font-size: 13px; display: block; opacity: 0.7; letter-spacing: 1.5px; }
+        .date-num { font-size: 38px; font-weight: 500; color: var(--gold); }
         
-        .meal-col { padding: 12px 18px; text-align: left; vertical-align: middle; position: relative; }
+        .meal-col { padding: 12px 18px; text-align: left; }
         
-        /* 增加感應區面積 */
         .slot { 
             min-height: 45px; display: flex; align-items: center; 
             font-size: 17px; margin: 6px 0; padding: 4px 8px; border-radius: 6px; 
-            transition: 0.2s; border: 1px solid transparent;
-            user-select: none; -webkit-user-select: none; /* 防止手機選取文字 */
+            cursor: grab; position: relative;
         }
 
-        /* 拖曳中的視覺回饋 */
-        .drag-over { background: rgba(197, 160, 89, 0.2) !important; border: 1px dashed var(--gold) !important; }
+        .drag-over { background: rgba(197, 160, 89, 0.3) !important; outline: 2px solid var(--gold); }
         
-        /* 手機拖曳時跟隨手指的虛影樣式 */
         #drag-proxy {
-            position: fixed; pointer-events: none; z-index: 1000;
-            background: var(--gold); color: #000; padding: 8px 15px;
-            border-radius: 8px; font-size: 16px; opacity: 0.8; display: none;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            position: fixed; pointer-events: none; z-index: 999999;
+            background: var(--gold); color: #000; padding: 10px 20px;
+            border-radius: 8px; opacity: 0.95; display: none; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+            font-weight: bold; white-space: nowrap;
         }
 
-        .past { opacity: 0.3; }
-        .today { background: rgba(197, 160, 89, 0.08); } 
-        .weekend-row { background: rgba(217, 136, 123, 0.02); }
-        .weekend-row .date-num, .weekend-row .day-label { color: var(--weekend); }
+        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
+        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 8px 18px; border-radius: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -76,7 +66,9 @@
     </div>
     
     <table id="mealTable"></table>
-    <div id="drag-proxy"></div> <script>
+    <div id="drag-proxy"></div>
+
+    <script>
         const config = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -93,7 +85,7 @@
         currentMon.setHours(0,0,0,0);
 
         let dragData = null;
-        let proxy = document.getElementById('drag-proxy');
+        const proxy = document.getElementById('drag-proxy');
 
         function render() {
             const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
@@ -104,112 +96,120 @@
                 const table = document.getElementById('mealTable');
                 table.innerHTML = "";
                 const labels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-                const today = new Date(); today.setHours(0,0,0,0);
 
                 for (let i = 0; i < 7; i++) {
                     let d = new Date(currentMon); d.setDate(d.getDate() + i);
                     let key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
                     let m = data[key] || {};
                     let isWE = (i >= 5);
-                    let status = (d < today) ? "past" : (d.getTime() === today.getTime() ? "today" : "");
                     
-                    let lTxt = m.lunch ? '☀️ ' + m.lunch : (isWE ? '☀️ -' : '');
-                    let dTxt = m.dinner ? '🌙 ' + m.dinner : (isWE ? '🌙 -' : '');
-
-                    table.innerHTML += `<tr class="${status} ${isWE ? 'weekend-row' : ''}">
+                    table.innerHTML += `<tr>
                         <td class="date-col">
                             <span class="day-label">${labels[i]}</span>
                             <span class="date-num">${d.getDate()}</span>
                         </td>
                         <td class="meal-col">
-                            <div class="slot" 
-                                 data-key="${key}" data-type="lunch" data-val="${m.lunch||""}"
-                                 ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)"
-                                 onclick="edit('${key}','lunch','${m.lunch||""}')">
-                                 ${lTxt}
-                            </div>
-                            <div class="slot" 
-                                 data-key="${key}" data-type="dinner" data-val="${m.dinner||""}"
-                                 ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)"
-                                 onclick="edit('${key}','dinner','${m.dinner||""}')">
-                                 ${dTxt}
-                            </div>
+                            <div class="slot" data-key="${key}" data-type="lunch" data-val="${m.lunch||""}">☀️ ${m.lunch || (isWE ? '-' : '')}</div>
+                            <div class="slot" data-key="${key}" data-type="dinner" data-val="${m.dinner||""}">🌙 ${m.dinner || (isWE ? '-' : '')}</div>
                         </td>
                     </tr>`;
                 }
             });
         }
 
-        // --- 手機觸控拖曳邏輯 ---
-        let startX, startY;
-        function ts(e) {
-            const el = e.currentTarget;
-            const val = el.getAttribute('data-val');
-            if(!val || val === "-") return; // 空的不能拖
+        // --- 全局事件接管邏輯 ---
 
-            // 延遲判斷：如果是短按則觸發編輯，長按才觸發拖曳 (這裡我們先簡單處理)
+        // 1. 按下 (MouseDown / TouchStart)
+        window.onmousedown = window.ontouchstart = function(e) {
+            const el = e.target.closest('.slot');
+            if (!el) return;
+
+            // 徹底阻止預設拖曳與選取
+            if (e.type === 'mousedown') e.preventDefault();
+
+            const x = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const y = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
             dragData = {
-                key: el.getAttribute('data-key'),
-                type: el.getAttribute('data-type'),
-                val: val
+                key: el.dataset.key,
+                type: el.dataset.type,
+                val: el.dataset.val,
+                text: el.innerText,
+                startX: x, startY: y,
+                moved: false,
+                startTime: Date.now()
             };
-            proxy.innerText = el.innerText;
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-        }
+        };
 
-        function tm(e) {
-            if(!dragData) return;
-            const x = e.touches[0].clientX;
-            const y = e.touches[0].clientY;
+        // 2. 移動 (MouseMove / TouchMove)
+        window.onmousemove = window.ontouchmove = function(e) {
+            if (!dragData) return;
 
-            // 顯示虛影並跟隨手指
-            proxy.style.display = 'block';
-            proxy.style.left = (x + 10) + 'px';
-            proxy.style.top = (y - 40) + 'px';
+            const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-            // 偵測手指下方的格子並加入視覺效果
-            const target = document.elementFromPoint(x, y);
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
-            const slot = target ? target.closest('.slot') : null;
-            if(slot) slot.classList.add('drag-over');
-            
-            // 防止螢幕捲動
-            if(Math.abs(y - startY) > 10) e.preventDefault();
-        }
+            const dist = Math.sqrt(Math.pow(x - dragData.startX, 2) + Math.pow(y - dragData.startY, 2));
 
-        function te(e) {
-            if(!dragData) return;
-            proxy.style.display = 'none';
-            
-            const x = e.changedTouches[0].clientX;
-            const y = e.changedTouches[0].clientY;
-            const target = document.elementFromPoint(x, y);
-            const slot = target ? target.closest('.slot') : null;
-
-            if(slot) {
-                const toK = slot.getAttribute('data-key');
-                const toT = slot.getAttribute('data-type');
-                if(dragData.key !== toK || dragData.type !== toT) {
-                    db.ref('meals_v2').child(dragData.key).child(dragData.type).remove();
-                    db.ref('meals_v2').child(toK).update({ [toT]: dragData.val });
-                }
+            if (!dragData.moved && dist > 8) {
+                dragData.moved = true;
+                document.body.classList.add('lock-scroll');
             }
-            
+
+            if (dragData.moved) {
+                if (e.cancelable) e.preventDefault();
+                proxy.innerText = dragData.text;
+                proxy.style.display = 'block';
+                proxy.style.left = (x + 10) + 'px';
+                proxy.style.top = (y - 20) + 'px';
+
+                // 高亮目標
+                const target = document.elementFromPoint(x, y);
+                document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+                const slot = target ? target.closest('.slot') : null;
+                if (slot) slot.classList.add('drag-over');
+            }
+        };
+
+        // 3. 放開 (MouseUp / TouchEnd)
+        window.onmouseup = window.ontouchend = function(e) {
+            if (!dragData) return;
+            const d = dragData;
+            const duration = Date.now() - d.startTime;
+
+            document.body.classList.remove('lock-scroll');
+            proxy.style.display = 'none';
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+
+            if (d.moved) {
+                const x = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
+                const y = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
+                const target = document.elementFromPoint(x, y);
+                const slot = target ? target.closest('.slot') : null;
+
+                if (slot) {
+                    const toK = slot.dataset.key;
+                    const toT = slot.dataset.type;
+                    if (d.val && d.val !== "" && (d.key !== toK || d.type !== toT)) {
+                        db.ref('meals_v2').child(d.key).child(d.type).remove();
+                        db.ref('meals_v2').child(toK).update({ [toT]: d.val });
+                    }
+                }
+            } else if (duration < 400) {
+                // 如果幾乎沒動就放開，視為點擊編輯
+                edit(d.key, d.type, d.val);
+            }
             dragData = null;
-        }
+        };
+
+        // 額外保險：禁止所有原生拖曳偵測
+        window.ondragstart = function() { return false; };
 
         function edit(k, t, old) {
-            // 為了不干擾拖曳，我們可以加個判斷，但 prompt 會阻塞，通常沒問題
-            setTimeout(() => {
-                if(dragData) return; // 正在拖曳就不編輯
-                let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
-                if (v !== null) {
-                    if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
-                    else db.ref('meals_v2').child(k).update({ [t]: v });
-                }
-            }, 100);
+            let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
+            if (v !== null) {
+                if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
+                else db.ref('meals_v2').child(k).update({ [t]: v.trim() });
+            }
         }
 
         function moveWeek(n) { currentMon.setDate(currentMon.getDate()+n); render(); }
