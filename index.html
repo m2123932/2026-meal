@@ -3,32 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 週規劃 (操作優化版)</title>
+    <title>2026 週規劃 (最終穩定版)</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        /* 允許捲動，但禁止畫布上的預設選取行為 */
         * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         body { 
             background-color: #1a120b; background-image: url('https://www.transparenttextures.com/patterns/wood-pattern-dark.png'); 
             color: #d4af37; font-family: "Times New Roman", "PingFang TC", serif; 
             display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px;
-            min-height: 100vh; overflow-y: auto; /* 允許垂直捲動 */
+            min-height: 100vh;
         }
         .header h1 { font-size: 1.1rem; letter-spacing: 5px; border-bottom: 1px solid #d4af37; padding-bottom: 3px; margin: 5px 0; }
         .nav-controls { 
             width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin: 10px 0;
-            position: relative; z-index: 10; /* 確保按鈕在最上層 */
         }
         button { 
             background: #2c1e14; border: 1px solid #d4af37; color: #d4af37; 
             padding: 10px 22px; border-radius: 20px; font-size: 0.85rem; cursor: pointer;
-            touch-action: manipulation; /* 優化手機點擊延遲 */
+            z-index: 100; position: relative;
         }
         canvas { 
             background: rgba(10, 8, 5, 0.98); border: 1px solid #d4af37; 
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 480px;
-            touch-action: pinch-zoom; /* 允許縮放與捲動，手勢交給 JS 判斷 */
+            touch-action: pan-y;
         }
         .hint { color: #8a6d3b; margin: 15px 0; font-size: 0.75rem; letter-spacing: 1px; }
     </style>
@@ -38,16 +36,16 @@
     <div class="header"><h1>MENU · WEEKLY</h1></div>
     
     <div class="nav-controls">
-        <button onclick="changeWeek(-1, event)">PREV</button>
-        <span id="weekRange" style="font-weight: bold; letter-spacing: 2px;"></span>
-        <button onclick="changeWeek(1, event)">NEXT</button>
+        <button id="btnPrev">PREV</button>
+        <span id="weekRange" style="font-weight: bold; letter-spacing: 2px;">載入中...</span>
+        <button id="btnNext">NEXT</button>
     </div>
 
     <canvas id="weekCanvas"></canvas>
-    
-    <div class="hint">☝ 短按編輯 | ✊ 長按拖曳 (垂直滑動可翻頁)</div>
+    <div class="hint">☝ 短按編輯 | ✊ 長按拖曳</div>
 
     <script>
+        // --- 1. Firebase 初始化 ---
         const firebaseConfig = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -61,35 +59,28 @@
         const db = firebase.database();
         const mealRef = db.ref('meals_v2');
 
+        // --- 2. 變數設定 ---
         const canvas = document.getElementById('weekCanvas');
         const ctx = canvas.getContext('2d');
         const weekRangeDisp = document.getElementById('weekRange');
-
-        const baseW = 500;
-        const baseH = 900; 
+        const baseW = 500, baseH = 900;
         canvas.width = baseW; canvas.height = baseH;
 
         let startOfWeek = new Date();
         let day = startOfWeek.getDay();
-        let diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-        startOfWeek.setDate(diff);
+        startOfWeek.setHours(0,0,0,0);
+        startOfWeek.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1)); // 設為週一
         
         let mealData = {};
-        let dragItem = null;
-        let dragTimer = null;
-        let isMovingPage = false; // 判斷是否在捲動頁面
+        let dragItem = null, dragTimer = null;
+        let startX = 0, startY = 0;
 
-        mealRef.on('value', (snapshot) => {
-            mealData = snapshot.val() || {};
-            draw();
-        });
-
+        // --- 3. 核心繪圖函數 ---
         function draw() {
             ctx.clearRect(0, 0, baseW, baseH);
-            const firstDate = new Date(startOfWeek);
-            const lastDate = new Date(startOfWeek);
+            const lastDate = new Date(startOfWeek); 
             lastDate.setDate(lastDate.getDate() + 6);
-            weekRangeDisp.innerText = `${firstDate.getMonth()+1}/${firstDate.getDate()} - ${lastDate.getMonth()+1}/${lastDate.getDate()}`;
+            weekRangeDisp.innerText = `${startOfWeek.getMonth()+1}/${startOfWeek.getDate()} - ${lastDate.getMonth()+1}/${lastDate.getDate()}`;
 
             const rowH = baseH / 7;
             const weeks = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
@@ -99,16 +90,20 @@
                 const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
                 const y = i * rowH;
 
+                // 格線
                 ctx.strokeStyle = "rgba(212, 175, 55, 0.2)";
                 ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(baseW-10, y); ctx.stroke();
-
-                ctx.fillStyle = (i >= 5) ? "#ff9e80" : "#d4af37"; 
+                
+                // 日期
+                ctx.fillStyle = (i >= 5) ? "#ff9e80" : "#d4af37";
                 ctx.font = "italic 13px Times New Roman"; ctx.fillText(weeks[i], 15, y + 30);
                 ctx.font = "bold 26px Times New Roman"; ctx.fillText(d.getDate(), 15, y + 60);
 
+                // 資料顯示
                 const data = mealData[dateKey] || {};
-                const textX = 95; const maxWidth = baseW - textX - 25;
-                ctx.font = "18px PingFang TC, serif";
+                const textX = 95, maxWidth = baseW - textX - 25;
+                ctx.font = "18px PingFang TC";
+                
                 if (data.lunch && !(dragItem && dragItem.dateKey === dateKey && dragItem.type === 'lunch')) {
                     ctx.fillStyle = "#eee6ac"; ctx.fillText("☀️ " + data.lunch, textX, y + 42, maxWidth);
                 }
@@ -119,34 +114,55 @@
             if (dragItem) {
                 ctx.fillStyle = "rgba(212, 175, 55, 0.9)";
                 ctx.font = "bold 22px PingFang TC";
-                ctx.fillText("🚚 " + dragItem.content, dragItem.currX - 30, dragItem.currY - 20);
+                ctx.fillText("🚚 " + dragItem.content, dragItem.currX, dragItem.currY - 20);
             }
         }
 
-        function getMousePos(e) {
+        // --- 4. 資料監聽 ---
+        mealRef.on('value', (snapshot) => {
+            mealData = snapshot.val() || {};
+            draw();
+        });
+
+        // --- 5. 事件處理 ---
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
             return {
-                x: (clientX - rect.left) * (baseW / rect.width),
-                y: (clientY - rect.top) * (baseH / rect.height)
+                x: (t.clientX - rect.left) * (baseW / rect.width),
+                y: (t.clientY - rect.top) * (baseH / rect.height)
             };
         }
 
-        function handleStart(e) {
-            isMovingPage = false;
-            const pos = getMousePos(e);
+        canvas.addEventListener('touchstart', (e) => {
+            const pos = getPos(e);
+            startX = pos.x; startY = pos.y;
             const rowH = baseH / 7;
-            const idx = Math.min(6, Math.max(0, Math.floor(pos.y / rowH)));
+            const idx = Math.floor(pos.y / rowH);
             const isLunch = (pos.y % rowH) < (rowH * 0.55);
             let d = new Date(startOfWeek); d.setDate(d.getDate() + idx);
-            const info = { dateKey: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, isLunch };
+            const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
             dragTimer = setTimeout(() => {
-                const type = info.isLunch ? 'lunch' : 'dinner';
-                const content = (mealData[info.dateKey] && mealData[info.dateKey][type]);
-                if (content) {
-                    dragItem = { ...info, type, content, currX: pos.x, currY: pos.y };
+                const type = isLunch ? 'lunch' : 'dinner';
+                if (mealData[dateKey] && mealData[dateKey][type]) {
+                    dragItem = { dateKey, type, content: mealData[dateKey][type], currX: pos.x, currY: pos.y };
                     if(window.navigator.vibrate) window.navigator.vibrate(40);
                 }
-            }, 500); //
+            }, 600);
+        }, {passive: true});
+
+        window.addEventListener('touchmove', (e) => {
+            const pos = getPos(e);
+            if (dragItem) {
+                if (e.cancelable) e.preventDefault();
+                dragItem.currX = pos.x; dragItem.currY = pos.y;
+                draw();
+            } else if (Math.abs(pos.y - startY) > 10) {
+                clearTimeout(dragTimer);
+            }
+        }, {passive: false});
+
+        window.addEventListener('touchend', (e) => {
+            clearTimeout(dragTimer);
+            const pos = getPos
