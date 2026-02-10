@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>2026 雲端拖曳午晚餐規劃表</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <style>
+        body { 
+            background-color: #1a120b; background-image: url('https://www.transparenttextures.com/patterns/wood-pattern-dark.png'); 
+            color: #d4af37; font-family: 'PingFang TC', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0;
+        }
+        .header { margin-bottom: 15px; text-align: center; }
+        .controls { margin-bottom: 20px; display: flex; align-items: center; gap: 30px; }
+        canvas { 
+            border: 12px double #d4af37; box-shadow: 0 20px 60px rgba(0,0,0,0.9); 
+            background: rgba(20, 15, 10, 0.95); cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+        button { 
+            background: linear-gradient(135deg, #f9f295, #d4af37, #b38728); 
+            border: 1px solid #8a6d3b; padding: 8px 18px; color: #2c1e14; 
+            font-weight: bold; cursor: pointer; border-radius: 4px;
+        }
+        .hint { color: #8a6d3b; margin-top: 15px; font-size: 0.9em; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 style="text-shadow: 2px 2px 4px #000;">2026 午晚餐規劃看板</h1>
+    </div>
+    
+    <div class="controls">
+        <button onclick="changeMonth(-1)">◀ 上個月</button>
+        <span id="monthDisplay" style="font-size: 1.8em; font-weight: bold; min-width: 180px; text-align: center;"></span>
+        <button onclick="changeMonth(1)">下個月 ▶</button>
+    </div>
+
+    <canvas id="calendarCanvas" width="1050" height="800"></canvas>
+    <p class="hint">● 雙擊格子編輯 | ● 長按餐點可拖曳換日 | ● 過去日期會自動變暗</p>
+
+    <script>
+        // --- Firebase 配置 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
+            authDomain: "mealplanner-972b1.firebaseapp.com",
+            databaseURL: "https://mealplanner-972b1-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "mealplanner-972b1",
+            storageBucket: "mealplanner-972b1.firebasestorage.app",
+            messagingSenderId: "511929578175",
+            appId: "1:511929578175:web:aa6a2680340e4501690c0a"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const mealRef = db.ref('meals_v2');
+
+        const canvas = document.getElementById('calendarCanvas');
+        const ctx = canvas.getContext('2d');
+        const monthDisplay = document.getElementById('monthDisplay');
+
+        let currentMonth = new Date().getMonth();
+        const year = 2026;
+        let mealData = {};
+
+        // 拖曳相關變數
+        let dragItem = null; // { day, type, content, x, y }
+        let isDragging = false;
+
+        mealRef.on('value', (snapshot) => {
+            mealData = snapshot.val() || {};
+            draw();
+        });
+
+        function getCell(x, y) {
+            const paddingTop = 60;
+            const cellW = canvas.width / 7;
+            const cellH = (canvas.height - paddingTop) / 6;
+            const col = Math.floor(x / cellW);
+            const row = Math.floor((y - paddingTop) / cellH);
+            const firstDay = new Date(year, currentMonth, 1).getDay();
+            const day = row * 7 + col - firstDay + 1;
+            const isLunch = ((y - paddingTop) % cellH) < (cellH / 2);
+            return { day, isLunch, x: col * cellW, y: row * cellH + paddingTop, w: cellW, h: cellH };
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            monthDisplay.innerText = `${months[currentMonth]} 2026`;
+
+            const daysInMonth = new Date(year, currentMonth + 1, 0).getDate();
+            const firstDay = new Date(year, currentMonth, 1).getDay();
+            const paddingTop = 60;
+            const cellW = canvas.width / 7;
+            const cellH = (canvas.height - paddingTop) / 6;
+
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            // 畫週標題
+            const weeks = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+            ctx.font = "bold 18px serif";
+            weeks.forEach((w, i) => {
+                ctx.fillStyle = "#d4af37";
+                ctx.fillText(w, i * cellW + cellW/2 - 20, 35);
+            });
+
+            let dayIdx = 1;
+            for (let r = 0; r < 6; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (r === 0 && c < firstDay) continue;
+                    if (dayIdx > daysInMonth) break;
+
+                    const x = c * cellW;
+                    const y = r * cellH + paddingTop;
+                    const thisDate = new Date(year, currentMonth, dayIdx);
+                    const isPast = thisDate < today;
+                    const isToday = thisDate.getTime() === today.getTime();
+
+                    // 背景色
+                    ctx.fillStyle = isPast ? "rgba(40, 30, 20, 0.7)" : (isToday ? "rgba(212, 175, 55, 0.1)" : "transparent");
+                    ctx.fillRect(x+5, y+5, cellW-10, cellH-10);
+
+                    // 邊框
+                    ctx.strokeStyle = isToday ? "#fff" : "rgba(212, 175, 55, 0.3)";
+                    ctx.lineWidth = isToday ? 2 : 1;
+                    ctx.strokeRect(x+5, y+5, cellW-10, cellH-10);
+
+                    // 日期文字
+                    ctx.fillStyle = isPast ? "#5e4d26" : "#d4af37";
+                    ctx.font = "16px Arial";
+                    ctx.fillText(dayIdx, x + 15, y + 30);
+
+                    // 渲染餐點內容 (拖曳中的物件不在此繪製)
+                    const data = mealData[`${year}-${currentMonth}-${dayIdx}`] || {};
+                    ctx.font = "14px Sans-Serif";
+                    
+                    if (data.lunch && !(dragItem && dragItem.day === dayIdx && dragItem.type === 'lunch')) {
+                        ctx.fillStyle = isPast ? "#777" : "#f9f295";
+                        ctx.fillText("☀️ " + data.lunch, x + 15, y + 55, cellW - 30);
+                    }
+                    if (data.dinner && !(dragItem && dragItem.day === dayIdx && dragItem.type === 'dinner')) {
+                        ctx.fillStyle = isPast ? "#555" : "#ffffff";
+                        ctx.fillText("🌙 " + data.dinner, x + 15, y + 90, cellW - 30);
+                    }
+
+                    dayIdx++;
+                }
+            }
+
+            // 繪製拖曳中的影子
+            if (isDragging && dragItem) {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "#d4af37";
+                ctx.fillStyle = dragItem.type === 'lunch' ? "#f9f295cc" : "#ffffffcc";
+                ctx.font = "bold 16px Sans-Serif";
+                ctx.fillText((dragItem.type==='lunch'?"☀️ ":"🌙 ") + dragItem.content, dragItem.currX, dragItem.currY);
+                ctx.restore();
+            }
+        }
+
+        // 事件監聽
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const cell = getCell(x, y);
+            
+            if (cell.day > 0) {
+                const data = mealData[`${year}-${currentMonth}-${cell.day}`];
+                const type = cell.isLunch ? 'lunch' : 'dinner';
+                if (data && data[type]) {
+                    dragItem = { day: cell.day, type, content: data[type], currX: x, currY: y };
+                    isDragging = true;
+                }
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const rect = canvas.getBoundingClientRect();
+            dragItem.currX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            dragItem.currY = (e.clientY - rect.top) * (canvas.height / rect.height);
+            draw();
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const cell = getCell(x, y);
+
+            if (cell.day > 0) {
+                const oldKey = `${year}-${currentMonth}-${dragItem.day}`;
+                const newKey = `${year}-${currentMonth}-${cell.day}`;
+                const newType = cell.isLunch ? 'lunch' : 'dinner';
+
+                // 雲端搬移邏輯
+                mealRef.child(oldKey).child(dragItem.type).remove();
+                mealRef.child(newKey).update({ [newType]: dragItem.content });
+            }
+            isDragging = false;
+            dragItem = null;
+            draw();
+        });
+
+        canvas.addEventListener('dblclick', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            const cell = getCell(x, y);
+
+            if (cell.day > 0) {
+                const key = `${year}-${currentMonth}-${cell.day}`;
+                const type = cell.isLunch ? 'lunch' : 'dinner';
+                const current = (mealData[key] && mealData[key][type]) || "";
+                const val = prompt(`${cell.day}日 ${type==='lunch'?'午餐':'晚餐'} 內容:`, current);
+                if (val !== null) {
+                    mealRef.child(key).update({ [type]: val });
+                }
+            }
+        });
+
+        function changeMonth(s) {
+            currentMonth = (currentMonth + s + 12) % 12;
+            draw();
+        }
+    </script>
+</body>
+</html>
