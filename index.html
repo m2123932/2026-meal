@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Long Press Drag</title>
+    <title>Meal Planner 2026 - Clean Layout</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -16,38 +16,34 @@
             margin: 0; padding: 0; min-height: 100%;
             background: #12100d; color: var(--text-main);
             font-family: -apple-system, sans-serif;
-            /* 允許捲動 */
             overflow-x: hidden; overflow-y: auto; 
             -webkit-user-select: none; user-select: none;
             -webkit-touch-callout: none;
         }
 
-        /* 僅在真正進入拖曳模式時鎖定 */
         body.is-dragging { overflow: hidden !important; touch-action: none !important; }
 
-        .header-area { padding: 10px 0 5px 0; text-align: center; }
+        /* 固定頂部區塊，防止重複出現 */
+        .top-bar { padding: 15px 0 5px 0; text-align: center; background: #12100d; position: sticky; top: 0; z-index: 100; }
         h3 { letter-spacing: 4px; margin: 5px 0; font-size: 18px; color: var(--gold); }
         
-        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto 10px auto; padding: 0 10px; }
-        .nav-btn { background: rgba(197, 160, 89, 0.1); border: 1px solid var(--gold-light); color: var(--gold); padding: 5px 15px; border-radius: 8px; font-size: 13px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto 10px auto; padding: 0 15px; }
+        .nav-btn { background: rgba(197, 160, 89, 0.1); border: 1px solid var(--gold-light); color: var(--gold); padding: 6px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
         
-        table { width: 98%; max-width: 600px; margin: 0 auto 50px auto; border-collapse: collapse; background: var(--bg); border-radius: 8px; overflow: hidden; }
+        table { width: 98%; max-width: 600px; margin: 0 auto 80px auto; border-collapse: collapse; background: var(--bg); border-radius: 8px; overflow: hidden; }
         tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
         
-        .date-col { width: 65px; padding: 8px 5px; text-align: center; border-right: 1px solid rgba(197, 160, 89, 0.1); }
+        .date-col { width: 65px; padding: 10px 5px; text-align: center; border-right: 1px solid rgba(197, 160, 89, 0.1); }
         .date-num { font-size: 28px; font-weight: 600; color: var(--gold); }
         
         .meal-col { padding: 4px 10px; }
-        
         .slot { 
-            min-height: 42px; display: flex; align-items: center; 
-            font-size: 16px; margin: 6px 0; padding: 2px 10px; border-radius: 4px; 
-            background: rgba(255,255,255,0.03);
-            /* 關鍵：設為 auto 讓瀏覽器預設處理捲動，直到我們用 JS 攔截 */
-            touch-action: auto; 
+            min-height: 42px; display: flex; align-items: center; font-size: 16px; 
+            margin: 6px 0; padding: 2px 10px; border-radius: 4px; background: rgba(255,255,255,0.03);
+            touch-action: auto; transition: background 0.2s;
         }
 
-        .active-drag { background: rgba(197, 160, 89, 0.4) !important; transform: scale(0.98); transition: 0.1s; }
+        .active-drag { background: rgba(197, 160, 89, 0.4) !important; transform: scale(0.98); }
         .drag-over { background: rgba(197, 160, 89, 0.3) !important; outline: 2px solid var(--gold); }
         
         #drag-proxy {
@@ -59,16 +55,24 @@
     </style>
 </head>
 <body id="mainBody">
-    <div class="header-area"><h3>PLANNER</h3></div>
-    <div class="nav">
-        <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
-        <span id="rangeDisplay">...</span>
-        <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
+
+    <div class="top-bar">
+        <h3>PLANNER</h3>
+        <div class="nav">
+            <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
+            <span id="rangeDisplay" style="font-size: 15px; font-weight: 500;">Loading...</span>
+            <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
+        </div>
     </div>
-    <table id="mealTable"></table>
+
+    <table id="mealTable">
+        <tbody id="tableContent"></tbody>
+    </table>
+
     <div id="drag-proxy"></div>
 
     <script>
+        // --- Firebase 配置 (請保持不變) ---
         const config = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -89,19 +93,22 @@
         const proxy = document.getElementById('drag-proxy');
         const body = document.getElementById('mainBody');
 
+        // --- 核心更新邏輯：只針對 tbody ---
         function render() {
             const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
             document.getElementById('rangeDisplay').innerText = `${currentMon.getMonth()+1}/${currentMon.getDate()} — ${sun.getMonth()+1}/${sun.getDate()}`;
+            
             db.ref('meals_v2').on('value', snap => {
                 const data = snap.val() || {};
-                const table = document.getElementById('mealTable');
-                table.innerHTML = "";
+                const content = document.getElementById('tableContent');
+                let html = "";
                 const labels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
                 for (let i = 0; i < 7; i++) {
                     let d = new Date(currentMon); d.setDate(d.getDate() + i);
                     let key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
                     let m = data[key] || {};
-                    table.innerHTML += `<tr>
+                    html += `<tr>
                         <td class="date-col"><div style="font-size:11px;opacity:0.5">${labels[i]}</div><div class="date-num">${d.getDate()}</div></td>
                         <td class="meal-col">
                             <div class="slot" data-key="${key}" data-type="lunch" data-val="${m.lunch||""}">☀️ ${m.lunch || ''}</div>
@@ -109,58 +116,32 @@
                         </td>
                     </tr>`;
                 }
+                content.innerHTML = html;
             });
         }
 
+        // --- 拖曳與長按邏輯 (與上版一致) ---
         const handleStart = (e) => {
             const el = e.target.closest('.slot');
             if (!el) return;
-
             const x = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-
-            // 初始化數據，但先標記為「未啟動拖曳 (isTriggered: false)」
-            dragData = {
-                el, key: el.dataset.key, type: el.dataset.type, val: el.dataset.val,
-                text: el.innerText, startX: x, startY: y, 
-                isTriggered: false, startTime: Date.now()
-            };
-
-            // 設定長按定時器 (350毫秒)
+            dragData = { el, key: el.dataset.key, type: el.dataset.type, val: el.dataset.val, text: el.innerText, startX: x, startY: y, isTriggered: false, startTime: Date.now() };
             clearTimeout(longPressTimer);
-            longPressTimer = setTimeout(() => {
-                if (dragData) {
-                    dragData.isTriggered = true;
-                    el.classList.add('active-drag');
-                    if (navigator.vibrate) navigator.vibrate(20); // 觸覺反饋 (Android)
-                }
-            }, 350); 
+            longPressTimer = setTimeout(() => { if (dragData) { dragData.isTriggered = true; el.classList.add('active-drag'); if (navigator.vibrate) navigator.vibrate(25); } }, 350); 
         };
 
         const handleMove = (e) => {
             if (!dragData) return;
-
             const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
             const dist = Math.sqrt(Math.pow(x - dragData.startX, 2) + Math.pow(y - dragData.startY, 2));
-
-            // 如果長按尚未觸發且移動超過一定距離，視為捲動，取消拖曳
-            if (!dragData.isTriggered && dist > 10) {
-                clearTimeout(longPressTimer);
-                dragData = null;
-                return;
-            }
-
-            // 如果已經進入長按觸發狀態
+            if (!dragData.isTriggered && dist > 10) { clearTimeout(longPressTimer); dragData = null; return; }
             if (dragData.isTriggered) {
-                if (e.cancelable) e.preventDefault(); // 鎖死捲動
+                if (e.cancelable) e.preventDefault();
                 body.classList.add('is-dragging'); 
-                
-                proxy.innerText = dragData.text;
-                proxy.style.display = 'block';
-                proxy.style.left = x + 'px';
-                proxy.style.top = (y - 40) + 'px';
-
+                proxy.innerText = dragData.text; proxy.style.display = 'block';
+                proxy.style.left = x + 'px'; proxy.style.top = (y - 40) + 'px';
                 const target = document.elementFromPoint(x, y);
                 document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
                 const slot = target ? target.closest('.slot') : null;
@@ -171,29 +152,20 @@
         const handleEnd = (e) => {
             clearTimeout(longPressTimer);
             if (!dragData) return;
-            
             const d = dragData;
-            const wasTriggered = d.isTriggered;
-            
-            body.classList.remove('is-dragging');
-            proxy.style.display = 'none';
+            body.classList.remove('is-dragging'); proxy.style.display = 'none';
             if (d.el) d.el.classList.remove('active-drag');
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
-
-            if (wasTriggered) {
+            if (d.isTriggered) {
                 const x = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
                 const y = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
                 const target = document.elementFromPoint(x, y);
                 const slot = target ? target.closest('.slot') : null;
-
                 if (slot && d.val && (d.key !== slot.dataset.key || d.type !== slot.dataset.type)) {
                     db.ref('meals_v2').child(d.key).child(d.type).remove();
                     db.ref('meals_v2').child(slot.dataset.key).update({ [slot.dataset.type]: d.val });
                 }
-            } else if (Date.now() - d.startTime < 350) {
-                // 如果只是快速點擊，則編輯
-                edit(d.key, d.type, d.val);
-            }
+            } else if (Date.now() - d.startTime < 350) { edit(d.key, d.type, d.val); }
             dragData = null;
         };
 
@@ -216,240 +188,4 @@
         render();
     </script>
 </body>
-</html><!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - No Selection</title>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-    <style>
-        :root { 
-            --gold: #c5a059; --gold-light: rgba(197, 160, 89, 0.2);
-            --bg: #0f0d0a; --text-main: #e0d5c1; 
-        }
-        
-        html, body {
-            margin: 0; padding: 0; min-height: 100%;
-            background: #12100d; color: var(--text-main);
-            font-family: -apple-system, sans-serif;
-            overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
-            
-            /* 關鍵：全域封鎖文字選取與 iOS 長按選單 */
-            -webkit-user-select: none;  
-            -moz-user-select: none;     
-            -ms-user-select: none;      
-            user-select: none;
-            -webkit-touch-callout: none; /* 禁用 iOS 長按選單 */
-        }
-
-        body.is-dragging { overflow: hidden !important; touch-action: none !important; }
-
-        .header-area { padding: 10px 0 5px 0; text-align: center; }
-        h3 { letter-spacing: 4px; margin: 5px 0; font-size: 18px; color: var(--gold); }
-        
-        .nav { 
-            display: flex; justify-content: space-between; align-items: center; 
-            max-width: 600px; margin: 0 auto 10px auto; padding: 0 10px; 
-        }
-        .nav-btn { 
-            background: rgba(197, 160, 89, 0.1); border: 1px solid var(--gold-light); 
-            color: var(--gold); padding: 5px 15px; border-radius: 8px; font-size: 13px;
-        }
-        
-        table { 
-            width: 98%; max-width: 600px; margin: 0 auto 50px auto; border-collapse: collapse; 
-            background: var(--bg); border-radius: 8px; overflow: hidden;
-        }
-
-        tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
-        
-        .date-col { 
-            width: 65px; padding: 8px 5px; text-align: center; 
-            border-right: 1px solid rgba(197, 160, 89, 0.1); 
-            background: rgba(255,255,255,0.01);
-        }
-        .day-label { font-size: 11px; opacity: 0.5; }
-        .date-num { font-size: 28px; font-weight: 600; color: var(--gold); line-height: 1.1; }
-        
-        .meal-col { padding: 4px 10px; text-align: left; }
-        
-        .slot { 
-            min-height: 38px; display: flex; align-items: center; 
-            font-size: 16px; margin: 4px 0; padding: 2px 10px; border-radius: 4px; 
-            background: rgba(255,255,255,0.03); border: 1px solid transparent;
-            touch-action: none; cursor: grab;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-
-        .drag-over { background: rgba(197, 160, 89, 0.3) !important; border: 1px solid var(--gold) !important; }
-        
-        #drag-proxy {
-            position: fixed; pointer-events: none; z-index: 999999;
-            background: var(--gold); color: #000; padding: 8px 16px;
-            border-radius: 6px; opacity: 0.95; display: none; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.5); font-weight: bold; font-size: 15px;
-        }
-
-        .today { background: rgba(197, 160, 89, 0.05); }
-    </style>
-</head>
-<body id="mainBody">
-    <div class="header-area">
-        <h3>PLANNER</h3>
-    </div>
-    <div class="nav">
-        <button class="nav-btn" onclick="moveWeek(-7)">PREV</button>
-        <span id="rangeDisplay" style="font-size: 15px; font-weight: 500;">...</span>
-        <button class="nav-btn" onclick="moveWeek(7)">NEXT</button>
-    </div>
-    
-    <table id="mealTable"></table>
-    <div id="drag-proxy"></div>
-
-    <script>
-        // Firebase 設定不變
-        const config = {
-            apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
-            authDomain: "mealplanner-972b1.firebaseapp.com",
-            databaseURL: "https://mealplanner-972b1-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "mealplanner-972b1",
-            appId: "1:511929578175:web:aa6a2680340e4501690c0a"
-        };
-        firebase.initializeApp(config);
-        const db = firebase.database();
-
-        let currentMon = new Date();
-        let day = currentMon.getDay();
-        currentMon.setDate(currentMon.getDate() - (day === 0 ? 6 : day - 1));
-        currentMon.setHours(0,0,0,0);
-
-        let dragData = null;
-        const proxy = document.getElementById('drag-proxy');
-        const body = document.getElementById('mainBody');
-
-        function render() {
-            const sun = new Date(currentMon); sun.setDate(sun.getDate() + 6);
-            document.getElementById('rangeDisplay').innerText = `${currentMon.getMonth()+1}/${currentMon.getDate()} — ${sun.getMonth()+1}/${sun.getDate()}`;
-            
-            db.ref('meals_v2').on('value', snap => {
-                const data = snap.val() || {};
-                const table = document.getElementById('mealTable');
-                table.innerHTML = "";
-                const labels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-                const now = new Date(); now.setHours(0,0,0,0);
-
-                for (let i = 0; i < 7; i++) {
-                    let d = new Date(currentMon); d.setDate(d.getDate() + i);
-                    let key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                    let m = data[key] || {};
-                    let isToday = d.getTime() === now.getTime();
-                    
-                    table.innerHTML += `<tr class="${isToday?'today':''}">
-                        <td class="date-col">
-                            <div class="day-label">${labels[i]}</div>
-                            <div class="date-num">${d.getDate()}</div>
-                        </td>
-                        <td class="meal-col">
-                            <div class="slot" data-key="${key}" data-type="lunch" data-val="${m.lunch||""}">☀️ ${m.lunch || ''}</div>
-                            <div class="slot" data-key="${key}" data-type="dinner" data-val="${m.dinner||""}">🌙 ${m.dinner || ''}</div>
-                        </td>
-                    </tr>`;
-                }
-            });
-        }
-
-        const handleStart = (e) => {
-            const el = e.target.closest('.slot');
-            if (!el) return;
-
-            // 關鍵：在按下時立刻阻止預設行為 (包括選取)
-            if (e.cancelable) e.preventDefault();
-
-            const x = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-            const y = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-            
-            dragData = {
-                key: el.dataset.key, type: el.dataset.type, val: el.dataset.val,
-                text: el.innerText, startX: x, startY: y, moved: false, startTime: Date.now()
-            };
-        };
-
-        const handleMove = (e) => {
-            if (!dragData) return;
-            
-            const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-            const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-            const dist = Math.sqrt(Math.pow(x - dragData.startX, 2) + Math.pow(y - dragData.startY, 2));
-
-            if (!dragData.moved && dist > 8) {
-                dragData.moved = true;
-                body.classList.add('is-dragging'); 
-            }
-
-            if (dragData.moved) {
-                if (e.cancelable) e.preventDefault();
-                proxy.innerText = dragData.text;
-                proxy.style.display = 'block';
-                proxy.style.left = (x + 10) + 'px';
-                proxy.style.top = (y - 20) + 'px';
-
-                const target = document.elementFromPoint(x, y);
-                document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
-                const slot = target ? target.closest('.slot') : null;
-                if (slot) slot.classList.add('drag-over');
-            }
-        };
-
-        const handleEnd = (e) => {
-            if (!dragData) return;
-            const d = dragData;
-            body.classList.remove('is-dragging');
-            proxy.style.display = 'none';
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
-
-            if (d.moved) {
-                const x = e.type === 'touchend' ? e.changedTouches[0].clientX : e.clientX;
-                const y = e.type === 'touchend' ? e.changedTouches[0].clientY : e.clientY;
-                const target = document.elementFromPoint(x, y);
-                const slot = target ? target.closest('.slot') : null;
-
-                if (slot && d.val && (d.key !== slot.dataset.key || d.type !== slot.dataset.type)) {
-                    db.ref('meals_v2').child(d.key).child(d.type).remove();
-                    db.ref('meals_v2').child(slot.dataset.key).update({ [slot.dataset.type]: d.val });
-                }
-            } else if (Date.now() - d.startTime < 400) {
-                edit(d.key, d.type, d.val);
-            }
-            dragData = null;
-        };
-
-        // 徹底禁止右鍵選單 (長按選單)
-        window.addEventListener('contextmenu', (e) => {
-            if (e.target.closest('.slot')) e.preventDefault();
-        }, false);
-
-        window.addEventListener('mousedown', handleStart, { passive: false });
-        window.addEventListener('touchstart', handleStart, { passive: false }); // 這裡改為 passive: false 才能 prevent
-        window.addEventListener('mousemove', handleMove, { passive: false });
-        window.addEventListener('touchmove', handleMove, { passive: false });
-        window.addEventListener('mouseup', handleEnd);
-        window.addEventListener('touchend', handleEnd);
-        
-        window.ondragstart = () => false;
-
-        function edit(k, t, old) {
-            let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
-            if (v !== null) {
-                if (v.trim()==="") db.ref('meals_v2').child(k).child(t).remove();
-                else db.ref('meals_v2').child(k).update({ [t]: v.trim() });
-            }
-        }
-
-        function moveWeek(n) { currentMon.setDate(currentMon.getDate()+n); render(); }
-        render();
-    </script>
-</body>
 </html>
-
