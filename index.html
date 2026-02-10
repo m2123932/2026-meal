@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meal Planner 2026 - Ultimate Drag</title>
+    <title>Meal Planner 2026 - Anti-Scroll</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -12,35 +12,43 @@
             --bg: #0f0d0a; --text-main: #e0d5c1; --weekend: #d9887b; 
         }
         
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            /* 關鍵 1：防止拖曳時頁面彈跳或下拉刷新 */
+            overscroll-behavior-y: contain; 
+        }
+
         body { 
             background: #15120e; color: var(--text-main); 
-            font-family: -apple-system, sans-serif; margin: 0; padding: 15px; text-align: center;
-            /* 徹底禁止所有原生選取行為 */
+            font-family: -apple-system, sans-serif; padding: 15px; text-align: center;
             user-select: none; -webkit-user-select: none; 
-            touch-action: pan-y;
+            /* 關鍵 2：全域禁止瀏覽器處理手勢，完全交由 JS 接管 */
+            touch-action: none; 
         }
         
-        /* 核心修正：禁止瀏覽器自帶的拖曳行為 */
-        * { -webkit-user-drag: none; -moz-user-drag: none; }
+        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
+        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 8px 18px; border-radius: 15px; cursor: pointer; touch-action: auto; }
         
-        body.lock-scroll { overflow: hidden !important; touch-action: none; }
-
         table { 
             width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; 
             background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--gold-light);
         }
 
         tr { border-bottom: 1px solid rgba(197, 160, 89, 0.1); }
-        .date-col { width: 85px; padding: 20px 12px; text-align: left; border-right: 1px solid rgba(197, 160, 89, 0.1); pointer-events: none; }
+        .date-col { width: 85px; padding: 20px 12px; text-align: left; border-right: 1px solid rgba(197, 160, 89, 0.1); }
         .day-label { font-size: 13px; display: block; opacity: 0.7; letter-spacing: 1.5px; }
         .date-num { font-size: 38px; font-weight: 500; color: var(--gold); }
         
         .meal-col { padding: 12px 18px; text-align: left; }
         
         .slot { 
-            min-height: 45px; display: flex; align-items: center; 
+            min-height: 48px; display: flex; align-items: center; 
             font-size: 17px; margin: 6px 0; padding: 4px 8px; border-radius: 6px; 
-            cursor: grab; position: relative;
+            cursor: pointer; border: 1px solid transparent;
+            /* 關鍵 3：確保格子內的觸碰不會啟動捲動 */
+            touch-action: none; 
         }
 
         .drag-over { background: rgba(197, 160, 89, 0.3) !important; outline: 2px solid var(--gold); }
@@ -50,11 +58,8 @@
             background: var(--gold); color: #000; padding: 10px 20px;
             border-radius: 8px; opacity: 0.95; display: none; 
             box-shadow: 0 15px 35px rgba(0,0,0,0.8);
-            font-weight: bold; white-space: nowrap;
+            font-weight: bold; font-size: 18px;
         }
-
-        .nav { display: flex; justify-content: space-between; align-items: center; max-width: 500px; margin: 0 auto 20px auto; }
-        .nav-btn { background: none; border: 1px solid var(--gold-light); color: var(--gold); padding: 8px 18px; border-radius: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -117,15 +122,14 @@
             });
         }
 
-        // --- 全局事件接管邏輯 ---
+        // --- 修正後的觸控/滑鼠統一邏輯 ---
 
-        // 1. 按下 (MouseDown / TouchStart)
-        window.onmousedown = window.ontouchstart = function(e) {
+        const handleStart = (e) => {
             const el = e.target.closest('.slot');
             if (!el) return;
 
-            // 徹底阻止預設拖曳與選取
-            if (e.type === 'mousedown') e.preventDefault();
+            // 徹底攔截原生行為
+            if (e.cancelable) e.preventDefault();
 
             const x = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
@@ -141,28 +145,28 @@
             };
         };
 
-        // 2. 移動 (MouseMove / TouchMove)
-        window.onmousemove = window.ontouchmove = function(e) {
+        const handleMove = (e) => {
             if (!dragData) return;
+
+            // 關鍵：在移動時不斷呼叫 preventDefault 並確保監聽器非 passive
+            if (e.cancelable) e.preventDefault();
 
             const x = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
             const y = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-            const dist = Math.sqrt(Math.pow(x - dragData.startX, 2) + Math.pow(y - dragData.startY, 2));
+            const dx = Math.abs(x - dragData.startX);
+            const dy = Math.abs(y - dragData.startY);
 
-            if (!dragData.moved && dist > 8) {
+            if (!dragData.moved && (dx > 5 || dy > 5)) {
                 dragData.moved = true;
-                document.body.classList.add('lock-scroll');
             }
 
             if (dragData.moved) {
-                if (e.cancelable) e.preventDefault();
                 proxy.innerText = dragData.text;
                 proxy.style.display = 'block';
                 proxy.style.left = (x + 10) + 'px';
-                proxy.style.top = (y - 20) + 'px';
+                proxy.style.top = (y - 25) + 'px';
 
-                // 高亮目標
                 const target = document.elementFromPoint(x, y);
                 document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
                 const slot = target ? target.closest('.slot') : null;
@@ -170,13 +174,11 @@
             }
         };
 
-        // 3. 放開 (MouseUp / TouchEnd)
-        window.onmouseup = window.ontouchend = function(e) {
+        const handleEnd = (e) => {
             if (!dragData) return;
             const d = dragData;
             const duration = Date.now() - d.startTime;
 
-            document.body.classList.remove('lock-scroll');
             proxy.style.display = 'none';
             document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
 
@@ -195,14 +197,21 @@
                     }
                 }
             } else if (duration < 400) {
-                // 如果幾乎沒動就放開，視為點擊編輯
                 edit(d.key, d.type, d.val);
             }
             dragData = null;
         };
 
-        // 額外保險：禁止所有原生拖曳偵測
-        window.ondragstart = function() { return false; };
+        // 關鍵 4：必須使用 passive: false 才能有效防止捲動
+        window.addEventListener('mousedown', handleStart, { passive: false });
+        window.addEventListener('touchstart', handleStart, { passive: false });
+        window.addEventListener('mousemove', handleMove, { passive: false });
+        window.addEventListener('touchmove', handleMove, { passive: false });
+        window.addEventListener('mouseup', handleEnd, { passive: false });
+        window.addEventListener('touchend', handleEnd, { passive: false });
+
+        // 預防萬一，鎖死原生拖曳
+        window.ondragstart = () => false;
 
         function edit(k, t, old) {
             let v = prompt(`編輯 ${t==='lunch'?'午餐':'晚餐'}:`, old);
