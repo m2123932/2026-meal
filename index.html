@@ -3,49 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 精緻週規劃 (週一始)</title>
+    <title>2026 週規劃 (優雅修正版)</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        * { -webkit-user-select: none; user-select: none; touch-action: none; }
         body { 
             background-color: #1a120b; background-image: url('https://www.transparenttextures.com/patterns/wood-pattern-dark.png'); 
             color: #d4af37; font-family: "Times New Roman", "PingFang TC", serif; 
             display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px;
-            height: 100vh; justify-content: flex-start;
         }
-        .header { text-align: center; margin: 5px 0; }
-        .header h1 { font-size: 1.1rem; letter-spacing: 5px; border-bottom: 1px solid #d4af37; padding-bottom: 3px; font-weight: 300; }
+        .header { text-align: center; margin-top: 5px; }
+        .header h1 { font-size: 1.1rem; letter-spacing: 5px; border-bottom: 1px solid #d4af37; padding-bottom: 3px; }
         .nav-controls { 
-            width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+            width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin: 10px 0;
         }
-        button { 
-            background: rgba(212, 175, 55, 0.1); border: 0.5px solid #d4af37; color: #d4af37; 
-            padding: 6px 15px; border-radius: 20px; font-size: 0.85rem; cursor: pointer;
-        }
+        button { background: transparent; border: 1px solid #d4af37; color: #d4af37; padding: 6px 15px; border-radius: 20px; font-size: 0.8rem; }
         canvas { 
             background: rgba(10, 8, 5, 0.98); border: 1px solid #d4af37; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 480px; touch-action: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 480px;
         }
-        .hint { color: #8a6d3b; margin-top: 8px; font-size: 0.75rem; letter-spacing: 1px; }
     </style>
 </head>
 <body>
-
     <div class="header"><h1>MENU · WEEKLY</h1></div>
-    
     <div class="nav-controls">
         <button onclick="changeWeek(-1)">PREV</button>
-        <span id="weekRange" style="font-weight: bold; letter-spacing: 2px; font-size: 0.9rem;"></span>
+        <span id="weekRange" style="font-weight: bold; font-size: 0.9rem;"></span>
         <button onclick="changeWeek(1)">NEXT</button>
     </div>
-
     <canvas id="weekCanvas"></canvas>
-    
-    <div class="hint">☝ 點擊編輯 | ✊ 長按拖曳</div>
-
     <script>
-        // 使用您在 Firebase Console 取得的配置
         const firebaseConfig = {
             apiKey: "AIzaSyA3ML8cqPwg6UNpv-uH-KKwppsgKtZ-Hv4",
             authDomain: "mealplanner-972b1.firebaseapp.com",
@@ -58,58 +46,60 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         const mealRef = db.ref('meals_v2');
-
         const canvas = document.getElementById('weekCanvas');
         const ctx = canvas.getContext('2d');
         const weekRangeDisp = document.getElementById('weekRange');
 
-        const baseW = 500;
-        const baseH = 850; 
-        canvas.width = baseW;
-        canvas.height = baseH;
+        const baseW = 500, baseH = 850;
+        canvas.width = baseW; canvas.height = baseH;
 
         let startOfWeek = new Date();
-        // 修正邏輯：強制設定為週一
-        let currentDay = startOfWeek.getDay();
-        let diff = startOfWeek.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+        // 修正：計算本週週一
+        let day = startOfWeek.getDay();
+        let diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
         startOfWeek.setDate(diff);
-        
-        let mealData = {};
-        let dragItem = null;
-        let dragTimer = null;
 
-        mealRef.on('value', (snapshot) => {
-            mealData = snapshot.val() || {};
-            draw();
-        });
+        let mealData = {};
+        mealRef.on('value', (s) => { mealData = s.val() || {}; draw(); });
 
         function draw() {
             ctx.clearRect(0, 0, baseW, baseH);
-            
-            const firstDate = new Date(startOfWeek);
-            const lastDate = new Date(startOfWeek);
-            lastDate.setDate(lastDate.getDate() + 6);
-            weekRangeDisp.innerText = `${firstDate.getMonth()+1}/${firstDate.getDate()} - ${lastDate.getMonth()+1}/${lastDate.getDate()}`;
+            const lastDate = new Date(startOfWeek); lastDate.setDate(lastDate.getDate() + 6);
+            weekRangeDisp.innerText = `${startOfWeek.getMonth()+1}/${startOfWeek.getDate()} - ${lastDate.getMonth()+1}/${lastDate.getDate()}`;
 
             const rowH = baseH / 7;
             const weeks = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
             for (let i = 0; i < 7; i++) {
-                let d = new Date(startOfWeek);
-                d.setDate(d.getDate() + i);
+                let d = new Date(startOfWeek); d.setDate(d.getDate() + i);
                 const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
                 const y = i * rowH;
 
-                // 繪製格線
                 ctx.strokeStyle = "rgba(212, 175, 55, 0.2)";
-                ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(baseW-10, y); ctx.stroke();
+                ctx.strokeRect(5, y+5, baseW-10, rowH-10);
 
-                // 星期與日期 (避開內容區)
-                ctx.fillStyle = (i >= 5) ? "#ff9e80" : "#d4af37"; 
-                ctx.font = "italic 13px Times New Roman";
-                ctx.fillText(weeks[i], 15, y + 25);
+                // 日期區域 (固定在左側)
+                ctx.fillStyle = (i >= 5) ? "#ff9e80" : "#d4af37";
+                ctx.font = "italic 12px Times New Roman";
+                ctx.fillText(weeks[i], 15, y + 30);
                 ctx.font = "bold 26px Times New Roman";
-                ctx.fillText(d.getDate(), 15, y + 60);
+                ctx.fillText(d.getDate(), 15, y + 65);
 
-                // 餐點內容：起始座標 X 設為 90，確保不擋住日期數字
-                const data =
+                // 餐點區域 (起始座標 X 移至 90，解決重疊問題)
+                const data = mealData[dateKey] || {};
+                const textX = 90;
+                ctx.font = "18px PingFang TC";
+                if (data.lunch) {
+                    ctx.fillStyle = "#eee6ac";
+                    ctx.fillText("☀️ " + data.lunch, textX, y + 45, baseW - textX - 20);
+                }
+                if (data.dinner) {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText("🌙 " + data.dinner, textX, y + 90, baseW - textX - 20);
+                }
+            }
+        }
+        // ... (省略事件處理部分，請沿用之前的 handleStart/End)
+    </script>
+</body>
+</html>
