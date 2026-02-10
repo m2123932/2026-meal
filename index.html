@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 週規劃看板</title>
+    <title>2026 精緻週規劃 (週一始)</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
@@ -12,36 +12,37 @@
             background-color: #1a120b; background-image: url('https://www.transparenttextures.com/patterns/wood-pattern-dark.png'); 
             color: #d4af37; font-family: "Times New Roman", "PingFang TC", serif; 
             display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px;
+            height: 100vh; justify-content: flex-start;
         }
-        .header { text-align: center; margin: 10px 0; }
-        .header h1 { font-size: 1.2rem; letter-spacing: 4px; border-bottom: 1px solid #d4af37; padding-bottom: 5px; }
+        .header { text-align: center; margin: 5px 0; }
+        .header h1 { font-size: 1.1rem; letter-spacing: 5px; border-bottom: 1px solid #d4af37; padding-bottom: 3px; font-weight: 300; }
         .nav-controls { 
-            width: 100%; max-width: 450px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+            width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
         }
         button { 
-            background: transparent; border: 1px solid #d4af37; color: #d4af37; 
-            padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; cursor: pointer;
+            background: rgba(212, 175, 55, 0.1); border: 0.5px solid #d4af37; color: #d4af37; 
+            padding: 6px 15px; border-radius: 20px; font-size: 0.85rem; cursor: pointer;
         }
         canvas { 
-            background: rgba(10, 8, 5, 0.95); border: 1px solid #d4af37; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 450px; touch-action: none;
+            background: rgba(10, 8, 5, 0.98); border: 1px solid #d4af37; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 100%; max-width: 480px; touch-action: none;
         }
-        .date-info { font-size: 0.8rem; color: #8a6d3b; margin-top: 10px; letter-spacing: 1px; }
+        .hint { color: #8a6d3b; margin-top: 8px; font-size: 0.75rem; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
-    <div class="header"><h1>WEEKLY MENU 2026</h1></div>
+    <div class="header"><h1>MENU · WEEKLY</h1></div>
     
     <div class="nav-controls">
-        <button onclick="changeWeek(-1)">上週</button>
-        <span id="weekRange" style="font-weight: bold; letter-spacing: 1px;"></span>
-        <button onclick="changeWeek(1)">下週</button>
+        <button onclick="changeWeek(-1)">PREV</button>
+        <span id="weekRange" style="font-weight: bold; letter-spacing: 2px; font-size: 0.9rem;"></span>
+        <button onclick="changeWeek(1)">NEXT</button>
     </div>
 
     <canvas id="weekCanvas"></canvas>
     
-    <div class="date-info">輕點編輯內容 | 長按餐點拖曳換日</div>
+    <div class="hint">☝ 點擊編輯 | ✊ 長按拖曳</div>
 
     <script>
         const firebaseConfig = {
@@ -62,12 +63,15 @@
         const weekRangeDisp = document.getElementById('weekRange');
 
         const baseW = 500;
-        const baseH = 800; 
+        const baseH = 850; // 稍微增加高度
         canvas.width = baseW;
         canvas.height = baseH;
 
-        let startOfWeek = new Date(); // 預設今天
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // 設為週日
+        let startOfWeek = new Date();
+        // 調整為週一為開始：如果今天是週日(0)，則減6天；否則減去 (getDay-1)
+        let day = startOfWeek.getDay();
+        let diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+        startOfWeek.setDate(diff);
         
         let mealData = {};
         let dragItem = null;
@@ -87,7 +91,7 @@
             weekRangeDisp.innerText = `${firstDate.getMonth()+1}/${firstDate.getDate()} - ${lastDate.getMonth()+1}/${lastDate.getDate()}`;
 
             const rowH = baseH / 7;
-            const weeks = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+            const weeks = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
             for (let i = 0; i < 7; i++) {
                 let d = new Date(startOfWeek);
@@ -96,42 +100,48 @@
                 const y = i * rowH;
 
                 // 繪製分隔線
-                ctx.strokeStyle = "rgba(212, 175, 55, 0.3)";
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(baseW, y); ctx.stroke();
+                ctx.strokeStyle = "rgba(212, 175, 55, 0.2)";
+                ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(baseW-10, y); ctx.stroke();
 
-                // 星期與日期 (優雅纖細字體)
-                ctx.fillStyle = (i === 0 || i === 6) ? "#ff9e80" : "#d4af37";
-                ctx.font = "italic 16px Times New Roman";
-                ctx.fillText(weeks[i], 20, y + 30);
-                ctx.font = "bold 22px Times New Roman";
-                ctx.fillText(d.getDate(), 20, y + 60);
+                // 星期與日期 (優化間距防止重疊)
+                ctx.fillStyle = (i >= 5) ? "#ff9e80" : "#d4af37"; // 週六日變色
+                ctx.font = "italic 13px Times New Roman";
+                ctx.fillText(weeks[i], 15, y + 25);
+                ctx.font = "bold 24px Times New Roman";
+                ctx.fillText(d.getDate(), 15, y + 55);
 
-                // 餐點內容
+                // 餐點內容 (X軸往後移至 85，增加可讀寬度)
                 const data = mealData[dateKey] || {};
+                const textX = 85; 
+                const maxWidth = baseW - textX - 20;
+                
                 ctx.font = "18px PingFang TC, serif";
                 
                 // 午餐
                 if (data.lunch && !(dragItem && dragItem.dateKey === dateKey && dragItem.type === 'lunch')) {
                     ctx.fillStyle = "#eee6ac";
-                    ctx.fillText("☀️ " + data.lunch, 100, y + 40, baseW - 120);
+                    ctx.fillText("☀️ " + data.lunch, textX, y + 42, maxWidth);
                 }
                 // 晚餐
                 if (data.dinner && !(dragItem && dragItem.dateKey === dateKey && dragItem.type === 'dinner')) {
                     ctx.fillStyle = "#ffffff";
-                    ctx.fillText("🌙 " + data.dinner, 100, y + 80, baseW - 120);
+                    ctx.fillText("🌙 " + data.dinner, textX, y + 85, maxWidth);
                 }
             }
 
             if (dragItem) {
-                ctx.fillStyle = "rgba(212, 175, 55, 0.8)";
+                ctx.save();
+                ctx.shadowBlur = 10; ctx.shadowColor = "#d4af37";
+                ctx.fillStyle = "rgba(249, 242, 149, 0.9)";
                 ctx.font = "bold 20px PingFang TC";
-                ctx.fillText("移动中: " + dragItem.content, dragItem.currX, dragItem.currY);
+                ctx.fillText("📦 " + dragItem.content, dragItem.currX - 40, dragItem.currY - 20);
+                ctx.restore();
             }
         }
 
         function getPosInfo(x, y) {
             const rowH = baseH / 7;
-            const idx = Math.floor(y / rowH);
+            const idx = Math.min(6, Math.max(0, Math.floor(y / rowH)));
             const isLunch = (y % rowH) < (rowH / 2);
             let d = new Date(startOfWeek);
             d.setDate(d.getDate() + idx);
@@ -142,66 +152,4 @@
             const rect = canvas.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const x = (clientX - rect.left) * (baseW / rect.width);
-            const y = (clientY - rect.top) * (baseH / rect.height);
-            const info = getPosInfo(x, y);
-
-            dragTimer = setTimeout(() => {
-                const type = info.isLunch ? 'lunch' : 'dinner';
-                const content = (mealData[info.dateKey] && mealData[info.dateKey][type]);
-                if (content) {
-                    dragItem = { dateKey: info.dateKey, type, content, currX: x, currY: y };
-                    if(window.navigator.vibrate) window.navigator.vibrate(40);
-                }
-            }, 350);
-        }
-
-        function handleMove(e) {
-            if (!dragItem) return;
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            dragItem.currX = (clientX - rect.left) * (baseW / rect.width);
-            dragItem.currY = (clientY - rect.top) * (baseH / rect.height);
-            draw();
-        }
-
-        function handleEnd(e) {
-            clearTimeout(dragTimer);
-            if (dragItem) {
-                const info = getPosInfo(dragItem.currX, dragItem.currY);
-                const newType = info.isLunch ? 'lunch' : 'dinner';
-                mealRef.child(dragItem.dateKey).child(dragItem.type).remove();
-                mealRef.child(info.dateKey).update({ [newType]: dragItem.content });
-                dragItem = null;
-            } else {
-                // 點擊編輯
-                const rect = canvas.getBoundingClientRect();
-                const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-                const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-                const x = (clientX - rect.left) * (baseW / rect.width);
-                const y = (clientY - rect.top) * (baseH / rect.height);
-                const info = getPosInfo(x, y);
-                const type = info.isLunch ? 'lunch' : 'dinner';
-                const current = (mealData[info.dateKey] && mealData[info.dateKey][type]) || "";
-                const val = prompt("輸入內容:", current);
-                if (val !== null) mealRef.child(info.dateKey).update({ [type]: val });
-            }
-            draw();
-        }
-
-        canvas.addEventListener('touchstart', handleStart, {passive: false});
-        window.addEventListener('touchmove', handleMove, {passive: false});
-        window.addEventListener('touchend', handleEnd);
-        canvas.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-
-        function changeWeek(step) {
-            startOfWeek.setDate(startOfWeek.getDate() + (step * 7));
-            draw();
-        }
-    </script>
-</body>
-</html>
+            const x = (clientX - rect.left) * (baseW / rect.
